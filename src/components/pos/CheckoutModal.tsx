@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { useCart } from '../../context/CartContext';
 import { useSettings } from '../../context/SettingsContext';
+import { useStoreData } from '../../context/StoreDataContext';
 import { formatCurrency, generateReceiptNumber } from '../../utils/formatters';
 import { sounds } from '../../utils/audio';
 import { db } from '../../db';
@@ -12,7 +13,6 @@ import {
   X, 
   CheckCircle2 
 } from 'lucide-react';
-
 
 interface CheckoutModalProps {
   isOpen: boolean;
@@ -27,6 +27,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
 }) => {
   const { cartItems, grandTotal, subtotal, discountTotal, taxAmount, totalCost, estimatedProfit, clearCart } = useCart();
   const { settings } = useSettings();
+  const { createSale } = useStoreData();
 
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cash');
   const [tenderedStr, setTenderedStr] = useState<string>('');
@@ -97,32 +98,15 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
         timestamp: now,
       };
 
-      // Atomic transaction: store sale, update inventory stocks, and write stock logs
-      await db.transaction('rw', [db.sales, db.products, db.stockLogs], async () => {
+      // Atomic sale checkout on central SQLite backend (updates product stock & writes stock log)
+      await createSale(sale);
+
+      // Also mirror locally in Dexie for offline resilience
+      try {
         await db.sales.add(sale);
-
-        for (const item of cartItems) {
-          const product = await db.products.get(item.product.id);
-          if (product) {
-            const newStock = Number((product.stockQuantity - item.quantity).toFixed(3));
-            await db.products.update(item.product.id, {
-              stockQuantity: newStock,
-              updatedAt: now,
-            });
-
-            await db.stockLogs.add({
-              id: `log-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
-              productId: product.id,
-              productName: product.name,
-              type: 'sale_deduction',
-              quantityDelta: -item.quantity,
-              costPerUnit: product.costPrice,
-              reason: `Sale ${receiptNumber}`,
-              timestamp: now,
-            });
-          }
-        }
-      });
+      } catch {
+        // Ignore
+      }
 
       sounds.playSuccessChime();
       clearCart();

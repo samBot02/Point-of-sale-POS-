@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import type { StoreSettings } from '../types';
 import { db } from '../db';
+import { api } from '../services/api';
 import { DEFAULT_STORE_SETTINGS } from '../db/initialData';
 
 interface SettingsContextType {
@@ -20,7 +21,7 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   useEffect(() => {
     const initSettings = async () => {
       try {
-        // Automatic cleanup of any previous demo/sample records
+        // Automatic cleanup of any previous demo/sample records in Dexie
         await db.transaction('rw', [db.products, db.expenses], async () => {
           const allProds = await db.products.toArray();
           const demoProdIds = allProds.filter((p) => /^prod-0\d+/.test(p.id)).map((p) => p.id);
@@ -35,6 +36,19 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           }
         });
 
+        // Try to fetch settings from centralized backend
+        try {
+          const remoteSettings = await api.getSettings();
+          if (remoteSettings && remoteSettings.storeName) {
+            setSettings({ ...DEFAULT_STORE_SETTINGS, ...remoteSettings });
+            await db.settings.put({ ...DEFAULT_STORE_SETTINGS, ...remoteSettings, id: 'current_settings' });
+            setLoading(false);
+            return;
+          }
+        } catch {
+          // If offline or not initialized, fallback to Dexie
+        }
+
         const stored = await db.settings.get('current_settings');
         if (stored) {
           setSettings(stored);
@@ -43,7 +57,7 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           setSettings(DEFAULT_STORE_SETTINGS);
         }
       } catch (err) {
-        console.error('Failed to load settings from Dexie:', err);
+        console.error('Failed to load settings:', err);
       } finally {
         setLoading(false);
       }
@@ -53,6 +67,11 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   const updateSettings = async (newSettings: Partial<StoreSettings>) => {
     const merged: StoreSettings = { ...settings, ...newSettings, id: 'current_settings' };
+    try {
+      await api.updateSettings(merged);
+    } catch {
+      // Ignore if cashier or server offline
+    }
     await db.settings.put(merged);
     setSettings(merged);
   };
@@ -64,6 +83,11 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       hasCompletedOnboarding: true,
       id: 'current_settings',
     };
+    try {
+      await api.updateSettings(updated);
+    } catch {
+      // Ignore
+    }
     await db.settings.put(updated);
     setSettings(updated);
   };

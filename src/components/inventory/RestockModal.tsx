@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import type { Product } from '../../types';
+import { useStoreData } from '../../context/StoreDataContext';
 import { db } from '../../db';
 import { formatCurrency, formatUnitQuantity } from '../../utils/formatters';
 import { useSettings } from '../../context/SettingsContext';
 import { X, Truck, CheckCircle2 } from 'lucide-react';
-
 
 interface RestockModalProps {
   product: Product | null;
@@ -20,6 +20,7 @@ export const RestockModal: React.FC<RestockModalProps> = ({
   onClose,
 }) => {
   const { settings } = useSettings();
+  const { adjustStock } = useStoreData();
 
   const [selectedProductId, setSelectedProductId] = useState<string>('');
   const [addedQuantity, setAddedQuantity] = useState<string>('10');
@@ -66,30 +67,15 @@ export const RestockModal: React.FC<RestockModalProps> = ({
     const now = new Date().toISOString();
     const todayStr = now.slice(0, 10);
 
-    await db.transaction('rw', [db.products, db.stockLogs, db.expenses], async () => {
-      // 1. Update Product Stock and wholesale cost
-      await db.products.update(currentProduct.id, {
-        stockQuantity: newStock,
-        costPrice: unitCost,
-        updatedAt: now,
-      });
-
-      // 2. Add Stock Log
-      await db.stockLogs.add({
-        id: `stock-log-${Date.now()}`,
+    try {
+      await adjustStock({
         productId: currentProduct.id,
-        productName: currentProduct.name,
-        type: 'restock',
         quantityDelta: qty,
-        costPerUnit: unitCost,
+        type: 'restock',
         reason: `Restocked from ${supplierName || 'Supplier'}`,
-        timestamp: now,
-      });
-
-      // 3. Optional: Automatically write to Expenses table!
-      if (logAsExpense && totalExpenseCost > 0) {
-        await db.expenses.add({
-          id: `exp-${Date.now()}`,
+        costPerUnit: unitCost,
+        logAsExpense,
+        expenseData: logAsExpense && totalExpenseCost > 0 ? {
           title: `Restock: ${qty} ${currentProduct.unit} of ${currentProduct.name}`,
           category: 'inventory_restock',
           amount: Number(totalExpenseCost.toFixed(2)),
@@ -97,10 +83,23 @@ export const RestockModal: React.FC<RestockModalProps> = ({
           payee: supplierName.trim() || 'Wholesale Supplier',
           date: todayStr,
           notes: `Purchased at ${formatCurrency(unitCost, settings.currencySymbol)}/${currentProduct.unit}`,
-          timestamp: now,
-        });
-      }
-    });
+        } : undefined,
+      });
+    } catch (err: any) {
+      alert(err.message || 'Failed to adjust stock on server.');
+      return;
+    }
+
+    // Mirror in local Dexie for offline
+    try {
+      await db.products.update(currentProduct.id, {
+        stockQuantity: newStock,
+        costPrice: unitCost,
+        updatedAt: now,
+      });
+    } catch {
+      // Ignore
+    }
 
     onClose();
   };

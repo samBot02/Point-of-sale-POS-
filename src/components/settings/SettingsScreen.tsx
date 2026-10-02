@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useSettings } from '../../context/SettingsContext';
+import { useStoreData } from '../../context/StoreDataContext';
 import { exportDatabaseJSON, importDatabaseJSON, exportInventoryCSV, exportSalesCSV, exportExpensesCSV } from '../../db/backupService';
 import { 
   Store, 
@@ -16,8 +17,7 @@ import {
 
 export const SettingsScreen: React.FC = () => {
   const { settings, updateSettings, clearAllData } = useSettings();
-
-
+  const { refreshData } = useStoreData();
 
   const [storeName, setStoreName] = useState(settings.storeName);
   const [storeAddress, setStoreAddress] = useState(settings.storeAddress);
@@ -59,6 +59,7 @@ export const SettingsScreen: React.FC = () => {
     if (confirm('Importing this backup will restore stored products, sales, and expenses. Continue?')) {
       const result = await importDatabaseJSON(file);
       setImportStatus(result);
+      await refreshData();
       setTimeout(() => setImportStatus(null), 5000);
     }
     e.target.value = '';
@@ -68,6 +69,7 @@ export const SettingsScreen: React.FC = () => {
     if (confirm('WARNING: Are you sure you want to delete ALL inventory, sales, and expense data? This cannot be undone!')) {
       if (confirm('Please confirm once more: All sales and inventory will be wiped.')) {
         await clearAllData();
+        await refreshData();
         alert('All store data has been cleared.');
       }
     }

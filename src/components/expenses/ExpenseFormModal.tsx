@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import type { Expense, ExpenseCategory } from '../../types';
+import { useStoreData } from '../../context/StoreDataContext';
 import { db } from '../../db';
 import { useSettings } from '../../context/SettingsContext';
 import { Receipt, X, CheckCircle2 } from 'lucide-react';
-
 
 interface ExpenseFormModalProps {
   isOpen: boolean;
@@ -28,6 +28,7 @@ export const ExpenseFormModal: React.FC<ExpenseFormModalProps> = ({
   expenseToEdit,
 }) => {
   const { settings } = useSettings();
+  const { createExpense, updateExpense } = useStoreData();
 
   const [title, setTitle] = useState(expenseToEdit?.title || '');
   const [category, setCategory] = useState<ExpenseCategory>(expenseToEdit?.category || 'utilities_cooling');
@@ -58,10 +59,25 @@ export const ExpenseFormModal: React.FC<ExpenseFormModalProps> = ({
       timestamp: expenseToEdit?.timestamp || now,
     };
 
-    if (expenseToEdit) {
-      await db.expenses.put(expenseData);
-    } else {
-      await db.expenses.add(expenseData);
+    try {
+      if (expenseToEdit) {
+        await updateExpense(expenseData.id, expenseData);
+      } else {
+        await createExpense(expenseData);
+      }
+    } catch (err: any) {
+      alert(err.message || 'Failed to save expense.');
+      return;
+    }
+
+    try {
+      if (expenseToEdit) {
+        await db.expenses.put(expenseData);
+      } else {
+        await db.expenses.add(expenseData);
+      }
+    } catch {
+      // Ignore
     }
 
     onClose();

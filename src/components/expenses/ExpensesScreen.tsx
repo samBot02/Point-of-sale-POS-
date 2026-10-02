@@ -1,6 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { useLiveQuery } from 'dexie-react-hooks';
-import { db } from '../../db';
+import { useStoreData } from '../../context/StoreDataContext';
 import type { Expense } from '../../types';
 import { useSettings } from '../../context/SettingsContext';
 import { formatCurrency, formatDateOnly } from '../../utils/formatters';
@@ -18,10 +17,9 @@ import {
   DollarSign
 } from 'lucide-react';
 
-
 export const ExpensesScreen: React.FC = () => {
   const { settings } = useSettings();
-  const expenses = useLiveQuery(() => db.expenses.toArray(), []) || [];
+  const { expenses, deleteExpense } = useStoreData();
 
   const [dateFilter, setDateFilter] = useState<'all' | 'this_month' | 'this_week' | 'today'>('this_month');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
@@ -101,7 +99,11 @@ export const ExpensesScreen: React.FC = () => {
 
   const handleDeleteExpense = async (id: string, title: string) => {
     if (confirm(`Delete expense record "${title}"?`)) {
-      await db.expenses.delete(id);
+      try {
+        await deleteExpense(id);
+      } catch (err: any) {
+        alert(err.message || 'Failed to delete expense.');
+      }
     }
   };
 

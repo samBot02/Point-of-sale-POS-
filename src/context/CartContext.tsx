@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useMemo } from 'react';
 import type { CartItem, Product, ParkedSale } from '../types';
 import { useSettings } from './SettingsContext';
+import { api } from '../services/api';
 import { db } from '../db';
 import { sounds } from '../utils/audio';
 
@@ -121,11 +122,27 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
       timestamp: new Date().toISOString(),
     };
 
-    await db.parkedSales.add(parked);
+    try {
+      await api.parkSale(parked);
+    } catch {
+      await db.parkedSales.add(parked);
+    }
     clearCart();
   };
 
   const resumeParkedSale = async (parkedSaleId: string) => {
+    try {
+      const list = await api.getParkedSales();
+      const match = list.find((p) => p.id === parkedSaleId);
+      if (match) {
+        setCartItems(match.items);
+        await api.deleteParkedSale(parkedSaleId);
+        return;
+      }
+    } catch {
+      // Fallback
+    }
+
     const parked = await db.parkedSales.get(parkedSaleId);
     if (!parked) return;
     setCartItems(parked.items);

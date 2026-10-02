@@ -1,8 +1,11 @@
 import React, { useState } from 'react';
+import { AuthProvider, useAuth } from './context/AuthContext';
 import { SettingsProvider, useSettings } from './context/SettingsContext';
+import { StoreDataProvider } from './context/StoreDataContext';
 import { CartProvider } from './context/CartContext';
 import { Navbar, type ActiveTab } from './components/layout/Navbar';
 
+import { LoginScreen } from './components/auth/LoginScreen';
 import { OnboardingModal } from './components/onboarding/OnboardingModal';
 import { PosScreen } from './components/pos/PosScreen';
 import { InventoryScreen } from './components/inventory/InventoryScreen';
@@ -12,18 +15,28 @@ import { SettingsScreen } from './components/settings/SettingsScreen';
 
 const MainLayout: React.FC = () => {
   const [activeTab, setActiveTab] = useState<ActiveTab>('pos');
-  const { loading } = useSettings();
+  const { loading: settingsLoading } = useSettings();
+  const { isAuthenticated, loading: authLoading, isCashier } = useAuth();
 
-  if (loading) {
+  if (authLoading || settingsLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50 text-slate-500 text-sm">
         <div className="flex flex-col items-center gap-3">
           <div className="w-8 h-8 border-3 border-emerald-600 border-t-transparent rounded-full animate-spin"></div>
-          <p className="font-semibold text-slate-700">Loading Grocery POS & Inventory...</p>
+          <p className="font-semibold text-slate-700">Connecting to Grocery POS Server...</p>
         </div>
       </div>
     );
   }
+
+  if (!isAuthenticated) {
+    return <LoginScreen />;
+  }
+
+  // Safe fallback if cashier somehow has manager tab selected
+  const currentTab = (isCashier && (activeTab === 'expenses' || activeTab === 'reports' || activeTab === 'settings'))
+    ? 'pos'
+    : activeTab;
 
   return (
     <div className="flex flex-col h-screen overflow-hidden bg-slate-50 font-sans text-slate-900">
@@ -31,15 +44,15 @@ const MainLayout: React.FC = () => {
       <OnboardingModal />
 
       {/* Top Header */}
-      <Navbar activeTab={activeTab} onTabChange={setActiveTab} />
+      <Navbar activeTab={currentTab} onTabChange={setActiveTab} />
 
       {/* Screen Views */}
       <main className="flex-1 overflow-hidden flex flex-col">
-        {activeTab === 'pos' && <PosScreen />}
-        {activeTab === 'inventory' && <InventoryScreen />}
-        {activeTab === 'expenses' && <ExpensesScreen />}
-        {activeTab === 'reports' && <ReportsScreen />}
-        {activeTab === 'settings' && <SettingsScreen />}
+        {currentTab === 'pos' && <PosScreen />}
+        {currentTab === 'inventory' && <InventoryScreen />}
+        {currentTab === 'expenses' && <ExpensesScreen />}
+        {currentTab === 'reports' && <ReportsScreen />}
+        {currentTab === 'settings' && <SettingsScreen />}
       </main>
     </div>
   );
@@ -47,10 +60,14 @@ const MainLayout: React.FC = () => {
 
 export default function App() {
   return (
-    <SettingsProvider>
-      <CartProvider>
-        <MainLayout />
-      </CartProvider>
-    </SettingsProvider>
+    <AuthProvider>
+      <SettingsProvider>
+        <StoreDataProvider>
+          <CartProvider>
+            <MainLayout />
+          </CartProvider>
+        </StoreDataProvider>
+      </SettingsProvider>
+    </AuthProvider>
   );
 }

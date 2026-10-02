@@ -1,26 +1,30 @@
 # 🛒 Grocery POS, Inventory & Expense Tracker
 
-A lightweight, modern, touch-friendly, and **100% offline-first** Point of Sale (POS), Inventory Management, and Expense Tracking system built specifically for small grocery shops, minimarts, and convenience stores.
+A lightweight, modern, touch-friendly Point of Sale (POS), Inventory Management, and Expense Tracking system built specifically for small grocery shops, minimarts, and convenience stores.
+
+Designed for **Local Area Network (LAN) Multi-Device Access**: Run the central server on one shop computer, and connect any tablet, smartphone, or cashier counter terminal over the shop's Wi-Fi.
 
 ![React](https://img.shields.io/badge/React-19.2-61DAFB?logo=react&logoColor=black)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.0-3178C6?logo=typescript&logoColor=white)
+![Express](https://img.shields.io/badge/Express-4.21-000000?logo=express&logoColor=white)
+![SQLite](https://img.shields.io/badge/SQLite-WAL_Mode-003B57?logo=sqlite&logoColor=white)
 ![Vite](https://img.shields.io/badge/Vite-8.3-646CFF?logo=vite&logoColor=white)
 ![TailwindCSS](https://img.shields.io/badge/Tailwind_CSS-v4.0-38B2AC?logo=tailwind-css&logoColor=white)
-![Dexie.js](https://img.shields.io/badge/IndexedDB-Dexie.js-FFA500?logoColor=white)
-![Offline First](https://img.shields.io/badge/Offline-100%25_Reliable-success)
+![LAN Multi-Device](https://img.shields.io/badge/LAN_Wi--Fi-Multi--Device-emerald)
 
 ---
 
-## 🌟 Overview
+## 🌟 Overview & LAN Multi-Device Architecture
 
 Small grocery stores have unique daily operational requirements:
-- **Fast counter checkout** with minimal clicks and zero latency.
-- **Produce & weighted sales** (selling packaged items by count and fruits/vegetables by weight in `kg` or `g`).
-- **Perishables & spoilage tracking** (monitoring expiration dates on milk, bread, produce, and logging damaged goods).
-- **Expense tracking & true Net Profit** (factoring in shop overhead like electricity/cold storage, store lease, wages, and vendor restocks alongside sales).
-- **Zero-downtime offline reliability** (the cash register must keep running seamlessly even if internet or Wi-Fi drops).
-
-This app runs locally in the browser with **Dexie.js (IndexedDB)**—meaning no monthly cloud database subscription, complete data privacy, and instant response times.
+- **Multi-Device Wi-Fi Access**: Connect phones, iPads, Android tablets, and PC registers on the shop Wi-Fi without cloud subscription fees.
+- **Fast Counter Authentication**: Cashiers log in in seconds using a **4-digit touch numpad PIN**, while Store Managers have username/password access.
+- **Role-Based Access Control**: Cashiers have access to the POS Register & product lookup; managers have full access to expenses, P&L reports, and staff management.
+- **Fast Counter Checkout**: Instant item addition via physical USB/Bluetooth barcode guns or camera scanner.
+- **Produce & Weighted Sales**: Sell packaged items by piece and fresh fruits/vegetables by weight (`kg` / `g`).
+- **Perishables & Spoilage Tracking**: Real-time expiration dates and one-click spoilage write-offs.
+- **Expense Tracking & True Net Profit**: Accounts for electricity/cooling, lease, wages, and vendor purchases.
+- **Centralized SQLite Database**: ACID transactions with WAL (Write-Ahead Logging) mode ensure multiple till terminals can operate concurrently without conflicts.
 
 ---
 
@@ -132,31 +136,51 @@ This app runs locally in the browser with **Dexie.js (IndexedDB)**—meaning no 
    npm install
    ```
 
-3. **Start the development server**:
+3. **Start the POS server & client**:
    ```bash
    npm run dev
    ```
+   This command starts both the **central SQLite backend API** (port 3001) and the **Vite frontend** (port 5173 with `--host` enabled for LAN access).
 
-4. **Open in browser**:
-   Navigate to the local URL displayed in the terminal (typically `http://localhost:5173`).
+4. **Access the application**:
+   - **On the host PC**: Open `http://localhost:5173`
+   - **On any phone, tablet, or terminal on shop Wi-Fi**: Open `http://<HOST_IP>:5173` (e.g. `http://192.168.0.11:5173`). The server terminal will print your exact Wi-Fi address on startup!
+
+---
+
+## 🔑 Default Login Credentials
+
+The server automatically pre-configures two initial accounts:
+
+| Role | Username | Password | Quick 4-Digit PIN | Permissions |
+| :--- | :--- | :--- | :--- | :--- |
+| **Store Manager (Admin)** | `admin` | `admin` | `1234` | Full access to POS, Inventory, Expenses, P&L Reports, Settings, and Staff Account Management |
+| **Cashier / Till Operator** | `cashier` | `cashier` | `0000` | POS Register and inventory stock lookups |
+
+> 💡 **Tip for Cashiers**: At the counter, cashiers can simply tap `0000` or their custom PIN on the touch numpad to sign into their till in under a second.
+> 
+> 🔒 **Security**: Managers can add new staff accounts, assign roles, or change passwords and PINs at any time by clicking the **Staff Accounts** icon in the header.
 
 ---
 
 ## 💻 Available Scripts
 
-- **`npm run dev`**: Starts Vite development server with Hot Module Replacement (HMR).
-- **`npm run build`**: Runs TypeScript compilation (`tsc -b`) and bundles production assets into `dist/`.
-- **`npm run preview`**: Serves the production build locally for testing.
+- **`npm run dev`**: Starts both the backend SQLite server and frontend client concurrently with LAN host binding.
+- **`npm run server`**: Starts only the backend API server (`tsx server/index.ts`).
+- **`npm run client`**: Starts only the Vite client (`vite --host`).
+- **`npm run build`**: Compiles TypeScript (`tsc -b`) and produces production bundles in `dist/`.
+- **`npm run preview`**: Serves the production build locally.
 
 ---
 
 ## 📖 Quick Usage Guide
 
 ### First-Time Launch
-1. When you first open the app, the **Welcome Setup Wizard** appears.
-2. Enter your **Shop Name**, **Address**, and **Phone Number**.
-3. Choose your preferred **Currency Symbol** (e.g. `$`, `€`, `£`, `₹`, `₦`, `R`, etc.).
-4. Set your optional **Sales Tax / VAT** percentage and click **Complete Setup**.
+1. Sign in with the **Store Manager** account (`admin` / `admin` or PIN `1234`).
+2. The **Welcome Setup Wizard** appears.
+3. Enter your **Shop Name**, **Address**, and **Phone Number**.
+4. Choose your preferred **Currency Symbol** (e.g. `$`, `€`, `£`, `₹`, `₦`, `R`, etc.).
+5. Set your optional **Sales Tax / VAT** percentage and click **Complete Setup**.
 
 ### Operating the POS Register
 1. **Adding Items**:

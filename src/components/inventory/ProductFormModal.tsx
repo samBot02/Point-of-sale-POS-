@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import type { Product, ProductUnit } from '../../types';
 import { GROCERY_CATEGORIES } from '../../db/initialData';
 import { generateSKU } from '../../utils/formatters';
+import { useStoreData } from '../../context/StoreDataContext';
 import { db } from '../../db';
 import { CameraScannerModal } from '../pos/CameraScannerModal';
 import { 
@@ -11,7 +12,6 @@ import {
   Sparkles, 
   Calendar 
 } from 'lucide-react';
-
 
 interface ProductFormModalProps {
   product: Product | null; // null if adding new
@@ -24,6 +24,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
   isOpen,
   onClose,
 }) => {
+  const { createProduct, updateProduct } = useStoreData();
   const isEditing = !!product;
 
   const [name, setName] = useState('');
@@ -109,10 +110,25 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
       updatedAt: now,
     };
 
-    if (isEditing) {
-      await db.products.put(productData);
-    } else {
-      await db.products.add(productData);
+    try {
+      if (isEditing) {
+        await updateProduct(productData.id, productData);
+      } else {
+        await createProduct(productData);
+      }
+    } catch (err: any) {
+      alert(err.message || 'Failed to save product to server.');
+      return;
+    }
+
+    try {
+      if (isEditing) {
+        await db.products.put(productData);
+      } else {
+        await db.products.add(productData);
+      }
+    } catch {
+      // Ignore
     }
 
     onClose();

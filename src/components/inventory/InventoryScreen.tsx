@@ -1,6 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { useLiveQuery } from 'dexie-react-hooks';
-import { db } from '../../db';
+import { useStoreData } from '../../context/StoreDataContext';
 import type { Product } from '../../types';
 import { GROCERY_CATEGORIES } from '../../db/initialData';
 import { useSettings } from '../../context/SettingsContext';
@@ -25,10 +24,9 @@ import {
   DollarSign
 } from 'lucide-react';
 
-
 export const InventoryScreen: React.FC = () => {
   const { settings } = useSettings();
-  const products = useLiveQuery(() => db.products.toArray(), []) || [];
+  const { products, deleteProduct } = useStoreData();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
@@ -103,7 +101,11 @@ export const InventoryScreen: React.FC = () => {
 
   const handleDeleteProduct = async (id: string, name: string) => {
     if (confirm(`Are you sure you want to delete "${name}" from inventory?`)) {
-      await db.products.delete(id);
+      try {
+        await deleteProduct(id);
+      } catch (err: any) {
+        alert(err.message || 'Failed to delete product.');
+      }
     }
   };
 

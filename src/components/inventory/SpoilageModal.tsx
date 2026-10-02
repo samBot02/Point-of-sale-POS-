@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import type { Product } from '../../types';
+import { useStoreData } from '../../context/StoreDataContext';
 import { db } from '../../db';
 import { formatCurrency, formatUnitQuantity } from '../../utils/formatters';
 import { useSettings } from '../../context/SettingsContext';
 import { X, Trash2 } from 'lucide-react';
-
 
 interface SpoilageModalProps {
   product: Product | null;
@@ -20,6 +20,7 @@ export const SpoilageModal: React.FC<SpoilageModalProps> = ({
   onClose,
 }) => {
   const { settings } = useSettings();
+  const { adjustStock } = useStoreData();
 
   const [selectedProductId, setSelectedProductId] = useState<string>('');
   const [wasteQuantity, setWasteQuantity] = useState<string>('1');
@@ -48,29 +49,15 @@ export const SpoilageModal: React.FC<SpoilageModalProps> = ({
     const now = new Date().toISOString();
     const todayStr = now.slice(0, 10);
 
-    await db.transaction('rw', [db.products, db.stockLogs, db.expenses], async () => {
-      // 1. Deduct stock from product
-      await db.products.update(currentProduct.id, {
-        stockQuantity: remainingStock,
-        updatedAt: now,
-      });
-
-      // 2. Add Stock Log
-      await db.stockLogs.add({
-        id: `spoilage-${Date.now()}`,
+    try {
+      await adjustStock({
         productId: currentProduct.id,
-        productName: currentProduct.name,
-        type: 'spoilage_waste',
         quantityDelta: -qty,
-        costPerUnit: currentProduct.costPrice,
+        type: 'spoilage_waste',
         reason: `${reason} (${qty} ${currentProduct.unit})`,
-        timestamp: now,
-      });
-
-      // 3. Optional: Log to Expenses as food waste loss
-      if (logAsExpense && lossValue > 0) {
-        await db.expenses.add({
-          id: `exp-${Date.now()}`,
+        costPerUnit: currentProduct.costPrice,
+        logAsExpense,
+        expenseData: logAsExpense && lossValue > 0 ? {
           title: `Spoilage Loss: ${qty} ${currentProduct.unit} of ${currentProduct.name}`,
           category: 'spoilage_waste',
           amount: Number(lossValue.toFixed(2)),
@@ -78,10 +65,22 @@ export const SpoilageModal: React.FC<SpoilageModalProps> = ({
           payee: 'Store Food Waste',
           date: todayStr,
           notes: `Reason: ${reason}`,
-          timestamp: now,
-        });
-      }
-    });
+        } : undefined,
+      });
+    } catch (err: any) {
+      alert(err.message || 'Failed to adjust stock on server.');
+      return;
+    }
+
+    // Mirror in local Dexie for offline resilience
+    try {
+      await db.products.update(currentProduct.id, {
+        stockQuantity: remainingStock,
+        updatedAt: now,
+      });
+    } catch {
+      // Ignore
+    }
 
     onClose();
   };

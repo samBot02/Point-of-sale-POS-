@@ -1,4 +1,5 @@
 import { db } from './index';
+import { api } from '../services/api';
 import type { Product, Sale, Expense } from '../types';
 
 export interface BackupData {
@@ -13,23 +14,29 @@ export interface BackupData {
 }
 
 export const exportDatabaseJSON = async () => {
-  const products = await db.products.toArray();
-  const sales = await db.sales.toArray();
-  const expenses = await db.expenses.toArray();
-  const stockLogs = await db.stockLogs.toArray();
-  const parkedSales = await db.parkedSales.toArray();
-  const settings = await db.settings.get('current_settings');
+  let backupData: any = null;
+  try {
+    backupData = await api.getBackupData();
+  } catch {
+    // Fallback to local Dexie
+    const products = await db.products.toArray();
+    const sales = await db.sales.toArray();
+    const expenses = await db.expenses.toArray();
+    const stockLogs = await db.stockLogs.toArray();
+    const parkedSales = await db.parkedSales.toArray();
+    const settings = await db.settings.get('current_settings');
 
-  const backupData: BackupData = {
-    version: 1,
-    timestamp: new Date().toISOString(),
-    storeSettings: settings,
-    products,
-    sales,
-    expenses,
-    stockLogs,
-    parkedSales,
-  };
+    backupData = {
+      version: 2,
+      timestamp: new Date().toISOString(),
+      storeSettings: settings,
+      products,
+      sales,
+      expenses,
+      stockLogs,
+      parkedSales,
+    };
+  }
 
   const jsonStr = JSON.stringify(backupData, null, 2);
   const blob = new Blob([jsonStr], { type: 'application/json' });
@@ -45,10 +52,16 @@ export const exportDatabaseJSON = async () => {
 export const importDatabaseJSON = async (file: File): Promise<{ success: boolean; message: string }> => {
   try {
     const text = await file.text();
-    const data = JSON.parse(text) as Partial<BackupData>;
+    const data = JSON.parse(text);
 
     if (!data.products || !Array.isArray(data.products)) {
       return { success: false, message: 'Invalid backup file format: missing products table.' };
+    }
+
+    try {
+      await api.restoreBackup(data);
+    } catch {
+      // Server fallback
     }
 
     await db.transaction('rw', [db.products, db.sales, db.expenses, db.stockLogs, db.parkedSales, db.settings], async () => {
@@ -73,7 +86,13 @@ export const importDatabaseJSON = async (file: File): Promise<{ success: boolean
 };
 
 export const exportInventoryCSV = async () => {
-  const products = await db.products.toArray();
+  let products: Product[] = [];
+  try {
+    products = await api.getProducts();
+  } catch {
+    products = await db.products.toArray();
+  }
+
   const headers = ['SKU', 'Barcode', 'Name', 'Category', 'Unit', 'Cost Price', 'Selling Price', 'Margin %', 'Stock Quantity', 'Min Stock Threshold', 'Expiry Date', 'Perishable'];
   
   const rows = products.map((p) => {
@@ -99,7 +118,13 @@ export const exportInventoryCSV = async () => {
 };
 
 export const exportSalesCSV = async () => {
-  const sales = await db.sales.toArray();
+  let sales: Sale[] = [];
+  try {
+    sales = await api.getSales();
+  } catch {
+    sales = await db.sales.toArray();
+  }
+
   const headers = ['Receipt Number', 'Date', 'Time', 'Items Count', 'Subtotal', 'Discount', 'Tax', 'Total Amount', 'COGS Cost', 'Gross Profit', 'Payment Method', 'Status'];
 
   const rows = sales.map((s) => {
@@ -125,7 +150,13 @@ export const exportSalesCSV = async () => {
 };
 
 export const exportExpensesCSV = async () => {
-  const expenses = await db.expenses.toArray();
+  let expenses: Expense[] = [];
+  try {
+    expenses = await api.getExpenses();
+  } catch {
+    expenses = await db.expenses.toArray();
+  }
+
   const headers = ['Date', 'Title', 'Category', 'Amount', 'Payment Method', 'Payee', 'Notes'];
 
   const rows = expenses.map((e) => [

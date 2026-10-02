@@ -1,8 +1,6 @@
 import React, { useState, useMemo } from 'react';
-import { useLiveQuery } from 'dexie-react-hooks';
-import { db } from '../../db';
+import { useStoreData } from '../../context/StoreDataContext';
 import { useSettings } from '../../context/SettingsContext';
-
 
 import { formatCurrency } from '../../utils/formatters';
 import { exportSalesCSV } from '../../db/backupService';
@@ -17,11 +15,9 @@ import {
   Award
 } from 'lucide-react';
 
-
 export const ReportsScreen: React.FC = () => {
   const { settings } = useSettings();
-  const sales = useLiveQuery(() => db.sales.toArray(), []) || [];
-  const expenses = useLiveQuery(() => db.expenses.toArray(), []) || [];
+  const { sales, expenses } = useStoreData();
 
   const [timeframe, setTimeframe] = useState<'today' | 'this_week' | 'this_month' | 'all'>('this_month');
 

@@ -2,6 +2,7 @@ import React from 'react';
 import type { ParkedSale } from '../../types';
 import { formatCurrency, formatDateTime } from '../../utils/formatters';
 import { useSettings } from '../../context/SettingsContext';
+import { useStoreData } from '../../context/StoreDataContext';
 import { db } from '../../db';
 import { ShoppingCart, Play, Trash2, X, Clock } from 'lucide-react';
 
@@ -19,13 +20,23 @@ export const ParkedSalesModal: React.FC<ParkedSalesModalProps> = ({
   onResume,
 }) => {
   const { settings } = useSettings();
+  const { deleteParkedSale } = useStoreData();
 
   if (!isOpen) return null;
 
   const handleDelete = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
     if (confirm('Discard this held cart?')) {
-      await db.parkedSales.delete(id);
+      try {
+        await deleteParkedSale(id);
+      } catch {
+        // Fallback
+      }
+      try {
+        await db.parkedSales.delete(id);
+      } catch {
+        // Ignore
+      }
     }
   };
 

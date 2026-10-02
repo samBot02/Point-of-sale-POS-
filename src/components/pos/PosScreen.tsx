@@ -1,6 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { useLiveQuery } from 'dexie-react-hooks';
-import { db } from '../../db';
+import { useStoreData } from '../../context/StoreDataContext';
 import type { Product, Sale } from '../../types';
 import { GROCERY_CATEGORIES } from '../../db/initialData';
 import { useCart } from '../../context/CartContext';
@@ -22,13 +21,9 @@ import {
   ShoppingBag
 } from 'lucide-react';
 
-
 export const PosScreen: React.FC = () => {
   const { addToCart, resumeParkedSale } = useCart();
-
-  // Reactive Dexie queries
-  const products = useLiveQuery(() => db.products.toArray(), []) || [];
-  const parkedSales = useLiveQuery(() => db.parkedSales.toArray(), []) || [];
+  const { products, parkedSales } = useStoreData();
 
   // Local UI State
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
